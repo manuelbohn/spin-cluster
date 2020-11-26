@@ -1,3 +1,33 @@
+---
+title: "AIS analysis"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+library(rwebppl)
+library(tidyverse)
+library(readxl)
+```
+
+```{r data}
+aoa_ratings <- read_xlsx(path = "data/words_aoa_ratings.xlsx", sheet = 1)%>%
+  filter(Word %in% c("carrot","duck","bread","apple","kite","horseshoe","plug","garlic","barrel","eggplant","pawn","papaya"))%>%
+  mutate(mean_aoa = as.numeric(Rating.Mean),
+         item = Word)%>%
+  select(item,mean_aoa)
+
+
+me_data <- read_csv("data/me.csv")
+prior_data <- read_csv("data/novelty.csv")
+comb_data <- read_csv("data/combination.csv")%>%
+  left_join(aoa_ratings) %>%
+  ungroup()%>%
+  mutate(item = fct_reorder(factor(item), mean_aoa))
+
+```
+
+```{r}
+model <- '
 // example call: time webppl integration_likelihood.wppl --require webppl-json --require webppl-csv
 
 
@@ -74,9 +104,9 @@ var levels = function(df, label) {
 
 //////////////// Inferring parameters //////////////
 
-var meData = json.read('../data/me.json');
-var priorData = json.read('../data/novelty.json');
-var combData = json.read('../data/combination.json');
+var meData = dataFromR.meData;
+var priorData = dataFromR.priorData;
+var combData = dataFromR.combData;
 
 var priorSubjects = levels(priorData, "subid")
 var priorSubjectsAges = sort(levels(priorData, "age_month"))
@@ -392,6 +422,11 @@ var model = function() {
 
   }
 
+'
+```
+
+```{r}
+ais <- '
   var steps = 1
   var samples = 1
 
@@ -405,3 +440,20 @@ var model = function() {
     var line_to_write = [modelVariant, steps, i, weight].join(",")
     webpplCsv.writeLine(line_to_write,fileHandle)
   }, _.range(samples))
+
+'
+```
+
+
+```{r}
+webppl(
+  program_code = paste(model,ais, sep='\n'),
+  data =list(meData = me_data, priorData = prior_data, combData = comb_data),
+  data_var = "dataFromR",
+  packages ="webppl-csv",
+  chains = 1,
+  cores = 1
+)
+```
+
+
