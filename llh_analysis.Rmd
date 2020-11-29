@@ -397,5 +397,10 @@ llh %>%
   summarize(marginal_likelihood = matrixStats::logSumExp(loglike_sample))
 ```
 
+For comparison: likelihood from previous run (lesioned and pragmatic model only). See https://github.com/manuelbohn/spin/blob/master/stats/model_comparison.Rmd line 104.
+
+```{r}
+readRDS("pred_model_likelihood.rds")
+```
 
 
