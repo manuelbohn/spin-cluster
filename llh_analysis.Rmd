@@ -7,6 +7,7 @@ output: html_document
 library(rwebppl)
 library(tidyverse)
 library(readxl)
+library(matrixStats)
 ```
 
 ```{r data}
@@ -369,124 +370,32 @@ var model  = function(){
 '
 ```
 
-```{r}
-llh <- '
-                      var pragPred = pragmaticListener({label: "novel_word"})
-
-                      var priorOnlyModelPredictions = Infer({method: "enumerate", model: function(){
-                      var obj = sample( Categorical({vs: all_objects, ps: priorComb}));
-                      return obj.shape == "novel_object" ? 1 : 0
-                    }})
-                      
-                     
-                    var total_correct = combinationData_byAge_byItem_byCondition.length == 0 ? false : sum(_.map(combinationData_byAge_byItem_byCondition, "correct"))
-                    
-                   // display(total_correct)
-                   
-                   
-          var mixtureModel = Infer({
-            model: function() {
-              sample(
-                flip(mixture) ? pragPred : priorOnlyModelPredictions
-              )
-            },
-            method: "enumerate"
-          })
-          
-          var devMixture = logistic(mixture_int + mixture_slope * age_month)
-          
-         var devMixtureModel = Infer({
-            model: function() {
-              sample(
-                flip(devMixture) ? pragPred : priorOnlyModelPredictions
-              )
-            },
-            method: "enumerate"
-          })
-                   
-                   var modelPredictions = 
-                    (model_type == "pragmatic") ? pragPred : 
-                    (model_type == "flat") ? pragPred : 
-                    (model_type == "global") ? pragPred : 
-                    (model_type == "prior_only") ? priorOnlyModelPredictions :
-                    (model_type == "bias") ? mixtureModel : devMixtureModel
-                      
-                      var loglike = total_correct ? Binomial({
-                       p: Math.exp(modelPredictions.score(1)), 
-                       n: combinationData_byAge_byItem_byCondition.length}).score(total_correct) : 0
-                     
-                    query.add(["likelihood",model_type], Math.exp(loglike))
-                    
-                    }, ["pragmatic", "global", "flat", "prior_only","bias","devBias"])
-
-                  }, ["congruent", "incongruent"])
-
-                }, familiars)
-
-              }, combDataAges)
-            
-            
-            return query
-            
-            }
-'
-```
-
 
 ```{r}
 llh <- webppl(
-  program_code = paste(model,llh, sep='\n'),
+  program_code = paste(model,llh_code, sep='\n'),
   data =list(meData = me_data, priorData = prior_data, combData = comb_data),
   data_var = "dataFromR",
   packages ="webppl-csv",
-  chains = 1,
-  cores = 1,
-  inference_opts = list(method = "MCMC", samples = 1, burn = 1, verbose = T)
+  chains = 5,
+  cores = 5,
+  inference_opts = list(method = "MCMC", samples = 10000, burn = 5000, verbose = T)
 )
+
+saveRDS(llh, "llh_10000.rds")
 ```
-
-
-
-# Playground 
-```{r}
-x <- '
-var combData = dataFromR.combData;
-
-var foreach = function(fn, lst) {
-  var foreach_ = function(i) {
-    if (i < lst.length) {
-      fn(lst[i]);
-      foreach_(i + 1);
-    }
-  };
-  foreach_(0);
-};
-
-foreach(function(alignment_condition){
-
-
-
-var priorProbs = (alignment_condition == "ff") ? "hey" : (alignment_condition == "ff") ? "hu" : "buh"
-
-display(priorProbs)
-
-
-}, ["congruent"])
-
-
-
-'
-```
-
 
 ```{r}
-webppl(
-  program_code = paste(x, sep='\n'),
-  data =list(meData = me_data, priorData = prior_data, combData = comb_data),
-  data_var = "dataFromR",
-  packages ="webppl-csv",
-  chains = 1,
-  cores = 1
-)
+llh <- readRDS("llh_10000.rds")
+
+llh %>%
+  mutate(loglike = log(value))%>%
+  separate(Parameter,c("type","model"),sep =",")%>%
+  group_by(model, Chain)%>%
+  summarise(loglike_sample = sum(loglike))%>%
+  group_by(model)%>%
+  summarize(marginal_likelihood = matrixStats::logSumExp(loglike_sample))
 ```
+
+
 
