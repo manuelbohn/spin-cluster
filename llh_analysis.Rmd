@@ -397,7 +397,7 @@ llh %>%
   summarize(marginal_likelihood = matrixStats::logSumExp(loglike_sample))
 ```
 
-For comparison: likelihood from previous run (lesioned and pragmatic model only). See https://github.com/manuelbohn/spin/blob/master/stats/model_comparison.Rmd line 104.
+For comparison: likelihood from previous run (lesioned and pragmatic model only). This is for prediction, which should basically be the same as we are doing here since we did not updating the parameters. See https://github.com/manuelbohn/spin/blob/master/stats/model_comparison.Rmd line 104 for how we computed the marginal likelihoods previously.
 
 ```{r}
 readRDS("pred_model_likelihood.rds")
