@@ -412,7 +412,7 @@ llh_code <- '
                        p: Math.exp(modelPredictions.score(1)), 
                        n: combinationData_byAge_byItem_byCondition.length}).score(total_correct) : 0
                      
-                    query.add(["likelihood",model_type], Math.exp(loglike))
+                    query.add(["likelihood", model_type, age_month, item, alignment_condition],loglike)
                     
                     }, ["pragmatic", "global", "flat", "prior_only","bias","devBias"])
 
@@ -430,28 +430,31 @@ llh_code <- '
 ```
 
 ```{r}
+start_time <- Sys.time()
 llh <- webppl(
   program_code = paste(model,llh_code, sep='\n'),
   data =list(meData = me_data, priorData = prior_data, combData = comb_data),
   data_var = "dataFromR",
   packages ="webppl-csv",
-  chains = 5,
-  cores = 5,
-  inference_opts = list(method = "MCMC", samples = 10000, burn = 5000, verbose = T)
+  chains = 2,
+  cores = 2,
+  inference_opts = list(method = "incrementalMH", samples = 3, lag = 4, burn = 1, verbose = T, verboseLag = 1)
 )
+end_time <- Sys.time()
+print(end_time - start_time)
 
-saveRDS(llh, "llh_10000.rds")
+
+#saveRDS(llh, "llh_10000.rds")
 ```
 
 ```{r}
-llh <- readRDS("llh_10000.rds")
+#llh <- readRDS("llh_10000.rds")
 
 llh %>%
-  mutate(loglike = log(value))%>%
-  separate(Parameter,c("type","model"),sep =",")%>%
+  separate(Parameter,c("type","model","age","item","condition"),sep =",")%>%
+  group_by(Chain, model, Iteration)%>%
+  summarise(loglike_sample = sum(value))%>%
   group_by(model, Chain)%>%
-  summarise(loglike_sample = sum(loglike))%>%
-  group_by(model)%>%
   summarize(marginal_likelihood = matrixStats::logSumExp(loglike_sample))
 ```
 
