@@ -1,35 +1,4 @@
----
-title: "SPIN LLH"
-output: html_document
----
-
-```{r setup, include=FALSE}
-library(rwebppl)
-library(tidyverse)
-library(readxl)
-library(matrixStats)
-```
-
-```{r data}
-aoa_ratings <- read_xlsx(path = "data/words_aoa_ratings.xlsx", sheet = 1)%>%
-  filter(Word %in% c("carrot","duck","bread","apple","kite","horseshoe","plug","garlic","barrel","eggplant","pawn","papaya"))%>%
-  mutate(mean_aoa = as.numeric(Rating.Mean),
-         item = Word)%>%
-  select(item,mean_aoa)
-
-
-me_data <- read_csv("data/me.csv")
-prior_data <- read_csv("data/novelty.csv")
-comb_data <- read_csv("data/combination.csv")%>%
-  left_join(aoa_ratings) %>%
-  ungroup()%>%
-  mutate(item = fct_reorder(factor(item), mean_aoa))
-
-```
-
-
-```{r}
-model <- '
+// example call: time webppl llh_model.wppl --require webppl-json --require webppl-sample-writer 1
 
 var chain = last(process.argv)
 
@@ -93,9 +62,9 @@ var levels = function(df, label){
 
 //////////////// Inferring parameters //////////////
 
-var meData = dataFromR.meData;
-var priorData = dataFromR.priorData;
-var combData = dataFromR.combData;
+var meData = json.read('data/me.json');
+var priorData = json.read('data/novelty.json');
+var combData = json.read('data/combination.json');
 
 var priorSubjects = levels(priorData, "subid")
 var priorSubjectsAges = sort(levels(priorData, "age_month"))
@@ -117,7 +86,7 @@ var model  = function(){
     b: 2,
     width: 0.4
   })
-  
+
   var mixture_int = uniformDrift({
     a: -2,
     b: 2,
@@ -320,8 +289,8 @@ var model  = function(){
                   foreach(function(alignment_condition){
 
                     var priorComb = (alignment_condition == "congruent") ? [priorReg, 1 - priorReg] : [1 - priorReg, priorReg]
-               
-                    
+
+
                    var combinationData_byAge_byItem_byCondition = _.filter(combData, {
                     age_month: age_month,
                     item: item,
@@ -332,7 +301,7 @@ var model  = function(){
                     foreach(function(model_type){
 
                       var sem_knowledge = (model_type == "global") ? global_sem_knowledge : item_sem_knowledge
-                      
+
                       var priorProbs = (model_type == "flat") ? [0.5, 0.5] : priorComb
 
                       var literalListener = cache(function(utterance){
@@ -367,96 +336,71 @@ var model  = function(){
                         }})
                       }
 
-'
-```
+var pragPred = pragmaticListener({label: "novel_word"})
+
+ var priorOnlyModelPredictions = Infer({method: "enumerate", model: function(){
+ var obj = sample( Categorical({vs: all_objects, ps: priorComb}));
+ return obj.shape == "novel_object" ? 1 : 0
+}})
 
 
-```{r}
-llh_code <- '
-                      var pragPred = pragmaticListener({label: "novel_word"})
+var total_correct = combinationData_byAge_byItem_byCondition.length == 0 ? false : sum(_.map(combinationData_byAge_byItem_byCondition, "correct"))
 
-                      var priorOnlyModelPredictions = Infer({method: "enumerate", model: function(){
-                      var obj = sample( Categorical({vs: all_objects, ps: priorComb}));
-                      return obj.shape == "novel_object" ? 1 : 0
-                    }})
-                      
-                     
-                    var total_correct = combinationData_byAge_byItem_byCondition.length == 0 ? false : sum(_.map(combinationData_byAge_byItem_byCondition, "correct"))
-                    
-                   // display(total_correct)
-       
-          var devMixture = logistic(mixture_int + mixture_slope * age_month)
-          
-                                      var modelPredictions = 
-                    (model_type == "pragmatic") ? pragPred : 
-                    (model_type == "flat") ? pragPred : 
-                    (model_type == "global") ? pragPred : 
-                    (model_type == "prior_only") ? priorOnlyModelPredictions :
-                    (model_type == "bias") ? Infer({
-            model: function() {
-              sample(
-                flip(mixture) ? pragPred : priorOnlyModelPredictions
-              )
-            },
-            method: "enumerate"
-          }) : Infer({
-            model: function() {
-              sample(
-                flip(devMixture) ? pragPred : priorOnlyModelPredictions
-              )
-            },
-            method: "enumerate"
-          })
-                      
-                      var loglike = total_correct ? Binomial({
-                       p: Math.exp(modelPredictions.score(1)), 
-                       n: combinationData_byAge_byItem_byCondition.length}).score(total_correct) : 0
-                     
-                    query.add(["likelihood", model_type, age_month, item, alignment_condition],loglike)
-                    
-                    }, ["pragmatic", "global", "flat", "prior_only","bias","devBias"])
+// display(total_correct)
 
-                  }, ["congruent", "incongruent"])
+var devMixture = logistic(mixture_int + mixture_slope * age_month)
 
-                }, familiars)
-
-              }, combDataAges)
-            
-            
-            return query
-            
-            }
-'
-```
-
-```{r}
-start_time <- Sys.time()
-llh <- webppl(
-  program_code = paste(model,llh_code, sep='\n'),
-  data =list(meData = me_data, priorData = prior_data, combData = comb_data),
-  data_var = "dataFromR",
-  packages ="webppl-csv",
-  chains = 1,
-  cores = 1,
-  inference_opts = list(method = "MCMC", samples = 5, lag = 2, burn = 5, verbose = T, verboseLag = 1)
+                 var modelPredictions =
+(model_type == "pragmatic") ? pragPred :
+(model_type == "flat") ? pragPred :
+(model_type == "global") ? pragPred :
+(model_type == "prior_only") ? priorOnlyModelPredictions :
+(model_type == "bias") ? Infer({
+model: function() {
+sample(
+flip(mixture) ? pragPred : priorOnlyModelPredictions
 )
-end_time <- Sys.time()
-print(end_time - start_time)
+},
+method: "enumerate"
+}) : Infer({
+model: function() {
+sample(
+flip(devMixture) ? pragPred : priorOnlyModelPredictions
+)
+},
+method: "enumerate"
+})
+
+ var loglike = total_correct ? Binomial({
+  p: Math.exp(modelPredictions.score(1)),
+  n: combinationData_byAge_byItem_byCondition.length}).score(total_correct) : 0
+
+query.add(["likelihood", model_type, age_month, item, alignment_condition],loglike)
+
+}, ["pragmatic", "global", "flat", "prior_only","bias","devBias"])
+
+}, ["congruent", "incongruent"])
+
+}, familiars)
+
+}, combDataAges)
 
 
-#saveRDS(llh, "llh_10000.rds")
-```
+return query
 
-```{r}
-#llh <- readRDS("llh_10000.rds")
+}
 
-llh %>%
-  separate(Parameter,c("type","model","age","item","condition"),sep =",")%>%
-  group_by(Chain, model, Iteration)%>%
-  summarise(loglike_sample = sum(value))%>%
-  group_by(model)%>%
-  summarize(marginal_likelihood = matrixStats::logSumExp(loglike_sample))
-```
+var header = "iteration,likelihood,model_type,age_month,item,alignment_condition,loglike"
 
+var output_file = 'output/llh_model_chain' + chain + '.csv'
+var callback = webpplSampleWriter.streamQueryCSV(output_file, header);
 
-
+var output = Infer({
+  model,
+  samples: 2000,
+  burn: 50000,
+  lag: 74,
+  method: 'MCMC',
+  verbose: T,
+  callbacks: [callback]
+});
