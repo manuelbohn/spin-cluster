@@ -404,7 +404,7 @@ return query
 
 }
 
-var header = "iteration,a,b,c,d,e,f,g"
+var header = "iteration,a,b,c,d,e,f"
 
 var output_file = 'output/llh_model_chain' + chain + '.csv'
 var callback = webpplSampleWriter.streamQueryCSV(output_file, header);
