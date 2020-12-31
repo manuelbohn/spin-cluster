@@ -302,7 +302,10 @@ var model  = function(){
 
                       var sem_knowledge = (model_type == "global") ? global_sem_knowledge : item_sem_knowledge
 
-                      var priorProbs = (model_type == "flat") ? [0.5, 0.5] : priorComb
+                      var priorProbs = (
+                        model_type == "flat" |
+                        model_type == "bias" |
+                        model_type == "devBias") ? [0.5, 0.5] : priorComb
 
                       var literalListener = cache(function(utterance){
                         Infer({method: "enumerate", model: function(){
