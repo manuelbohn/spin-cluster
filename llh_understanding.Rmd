@@ -1,0 +1,158 @@
+---
+title: "SPIN LLH understanding"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+library(rwebppl)
+library(tidyverse)
+library(readxl)
+library(matrixStats)
+```
+
+```{r data}
+aoa_ratings <- read_xlsx(path = "data/words_aoa_ratings.xlsx", sheet = 1)%>%
+  filter(Word %in% c("carrot","duck","bread","apple","kite","horseshoe","plug","garlic","barrel","eggplant","pawn","papaya"))%>%
+  mutate(mean_aoa = as.numeric(Rating.Mean),
+         item = Word)%>%
+  select(item,mean_aoa)
+
+
+me_data <- read_csv("data/me.csv")
+prior_data <- read_csv("data/novelty.csv")
+comb_data <- read_csv("data/combination.csv")%>%
+  left_join(aoa_ratings) %>%
+  ungroup()%>%
+  mutate(item = fct_reorder(factor(item), mean_aoa))
+
+d_model_comp <- comb_data%>%
+  select(-age)%>%
+  mutate(age = round(age_month,4),
+         item = as.character(item))%>%
+  select(alignment, item, age, correct)
+
+
+comb_data_summarized <- d_model_comp %>% 
+  group_by(alignment, item, age) %>% 
+  summarize(n=n(), k = sum(correct))
+
+```
+
+
+```{r}
+model <- bind_rows(
+  read_csv("output/llh_model_chain1.csv")%>%mutate(chain = 1),
+  #read_csv("../saves/llh_model_chain2.csv")%>%mutate(chain = 2),
+  #read_csv("../saves/llh_model_chain3.csv")%>%mutate(chain = 3)
+)
+```
+```{r}
+pred <- model %>%
+  filter(a == "modelPrediction")%>%
+  rename(type = a,
+         model = b, 
+         alignment = c,
+         age = d,
+         item = e, 
+         pred = f)%>%
+  mutate(age = as.numeric(age))%>%
+  left_join(comb_data_summarized)%>%
+  filter(!is.na(n))
+
+log_pred <- pred%>%
+  mutate(loglike_pred = dbinom(x = k, size = n, prob = pred, log = TRUE))%>%
+  select(-n,-k, -type)
+```
+
+```{r}
+log_model <- model %>%
+  filter(a == "likelihood")%>%
+  rename(type = a,
+         model = b, 
+         alignment = c,
+         age = d,
+         item = e, 
+         loglike_model = f)%>%
+  mutate(age = as.numeric(age))%>%
+  filter(loglike_model != 0.0000)%>%
+  select(-type)
+```
+
+```{r}
+log <- log_pred %>%
+  full_join(log_model)%>%
+  mutate(check = loglike_pred - loglike_model)
+
+filter(log, check > 0.00000000001)
+```
+
+```{r}
+log %>%
+  group_by(chain, model, iteration) %>%
+  summarize(total_likelihood_sample_pred = sum(loglike_pred),
+            total_likelihood_sample_model = sum(loglike_model))%>%
+  group_by(model) %>%
+  summarize(marginal_likelihood_pred = matrixStats::logSumExp(total_likelihood_sample_pred),
+            marginal_likelihood_model = matrixStats::logSumExp(total_likelihood_sample_model))
+  
+```
+
+
+```{r}
+item_params <-  model %>%
+  filter(b == "items")%>%
+  select(-a,-b, -e, -f)%>%
+    rename(item = c,
+         parameter = d,
+         value = g)
+
+global_params <- model %>%
+  filter(b == "parameters")%>%
+  select(-a,-b, -e, -g)%>%
+    rename(parameter = c,
+         type = d,
+         value = f)
+
+item_sigma<- model %>%
+  filter(b == "sigma",
+         c == "global_sem_sigmas")%>%
+  select(-a,-b, -e,-g)%>%
+    rename(parameter = c,
+         type = d,
+         value = f)
+
+```
+
+```{r, message = F}
+ggplot(item_params, aes(x = value, col = factor(chain), fill = factor(chain)))+
+  geom_density(alpha = 0.8, adjust = 2)+
+  xlab("value")+
+  facet_wrap(parameter ~ item, nrow = 2, scales = 'free')+
+  theme_minimal()+
+  theme(legend.position = "bottom")+
+  scale_fill_viridis_d()+
+  scale_color_viridis_d()
+```
+
+```{r}
+ggplot(global_params, aes(x = value, col = factor(chain), fill = factor(chain)))+
+  geom_density(alpha = 0.8, adjust = 2)+
+  xlab("value")+
+  facet_grid(type ~ parameter, scales = 'free')+
+  theme_minimal()+
+  theme(legend.position = "bottom")+
+  scale_fill_viridis_d()+
+  scale_color_viridis_d()
+```
+
+
+```{r}
+ggplot(item_sigma, aes(x = value, col = factor(chain), fill = factor(chain)))+
+  geom_density(alpha = 0.8, adjust = 2)+
+  xlab("value")+
+  facet_grid( ~ type, scales = 'free')+
+  theme_minimal()+
+  theme(legend.position = "bottom")+
+  scale_fill_viridis_d()+
+  scale_color_viridis_d()
+```

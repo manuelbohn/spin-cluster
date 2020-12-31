@@ -448,14 +448,26 @@ print(end_time - start_time)
 ```
 
 ```{r}
-#llh <- readRDS("llh_10000.rds")
+llh <- bind_rows(
+  read_csv("../saves/llh_model_chain1.csv")%>%mutate(chain = 1),
+  read_csv("../saves/llh_model_chain2.csv")%>%mutate(chain = 2),
+  read_csv("../saves/llh_model_chain3.csv")%>%mutate(chain = 3)
+)
 
 llh %>%
-  separate(Parameter,c("type","model","age","item","condition"),sep =",")%>%
-  group_by(Chain, model, Iteration)%>%
-  summarise(loglike_sample = sum(value))%>%
-  group_by(model)%>%
-  summarize(marginal_likelihood = matrixStats::logSumExp(loglike_sample))
+  filter(loglike != 0)%>%
+  group_by(model_type, chain, iteration)%>%
+  summarise(loglike_sample = sum(loglike))%>%
+  group_by(model_type,chain)%>%
+  summarize(marginal_likelihood = matrixStats::logSumExp(loglike_sample))%>%
+  spread(chain, marginal_likelihood)
+
+
+ggplot(x, aes(x = loglike_sample, col = model_type, fill = model_type))+
+  geom_density(alpha= .5)+
+  scale_fill_viridis_d()+
+  scale_color_viridis_d()+
+  theme_minimal()
 ```
 
 

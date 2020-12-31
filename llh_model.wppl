@@ -134,8 +134,8 @@ var model  = function(){
 
   }, priorSubjectsAges)
 
-  //query.add(["parameter","parameters", "prior", "intercept", "NA", "NA"], prior_int)
-  //query.add(["parameter","parameters", "prior", "slope", "NA", "NA"], prior_slope)
+  query.add(["parameter","parameters", "prior", "intercept", "NA"], prior_int)
+  query.add(["parameter","parameters", "prior", "slope", "NA"], prior_slope)
 
 
   //////////////// Semantic knowledge and speaker optimality ////////////////////////
@@ -344,13 +344,13 @@ var pragPred = pragmaticListener({label: "novel_word"})
 }})
 
 
-var total_correct = combinationData_byAge_byItem_byCondition.length == 0 ? false : sum(_.map(combinationData_byAge_byItem_byCondition, "correct"))
+var total_correct = combinationData_byAge_byItem_byCondition.length == 0 ? "noData" : sum(_.map(combinationData_byAge_byItem_byCondition, "correct"))
 
 // display(total_correct)
 
 var devMixture = logistic(mixture_int + mixture_slope * age_month)
 
-                 var modelPredictions =
+var modelPredictions =
 (model_type == "pragmatic") ? pragPred :
 (model_type == "flat") ? pragPred :
 (model_type == "global") ? pragPred :
@@ -371,11 +371,13 @@ flip(devMixture) ? pragPred : priorOnlyModelPredictions
 method: "enumerate"
 })
 
- var loglike = total_correct ? Binomial({
+ var loglike = (total_correct == "noData")? 0 : Binomial({
   p: Math.exp(modelPredictions.score(1)),
-  n: combinationData_byAge_byItem_byCondition.length}).score(total_correct) : 0
+  n: combinationData_byAge_byItem_byCondition.length}).score(total_correct)
 
-query.add(["likelihood", model_type, age_month, item, alignment_condition],loglike)
+query.add(["likelihood", model_type, alignment_condition,age_month, item],loglike)
+query.add(["modelPrediction",model_type, alignment_condition,age_month, item], Math.exp(modelPredictions.score(1)))
+//query.add(["numbers",model_type, alignment_condition,age_month, item,combinationData_byAge_byItem_byCondition.length], total_correct)
 
 }, ["pragmatic", "global", "flat", "prior_only","bias","devBias"])
 
@@ -385,21 +387,33 @@ query.add(["likelihood", model_type, age_month, item, alignment_condition],logli
 
 }, combDataAges)
 
+foreach(function(item){
+  var itemLineParameters = all_item_parameters[item]
+  query.add(["parameter","items", item, "intercept", "NA", "NA"], itemLineParameters.intercept)
+  query.add(["parameter","items", item, "slope", "NA", "NA"], itemLineParameters.slope)
+}, familiars)
 
+query.add(["parameter","parameters","speaker_optimality", "intercept", "NA"], speakerOptimalityParameters.intercept)
+query.add(["parameter","parameters","speaker_optimality", "slope", "NA"], speakerOptimalityParameters.slope)
+query.add(["parameter","parameters", "global_sem", "intercept", "NA"], globalLineParameters.intercept)
+query.add(["parameter","parameters", "global_sem", "slope", "NA"], globalLineParameters.slope)
+query.add(["parameter","sigma", "global_sem_sigmas", "intercept", "NA"], itemVariability.intercept)
+query.add(["parameter","sigma", "global_sem_sigmas", "slope", "NA"], itemVariability.slope)
+return query
 return query
 
 }
 
-var header = "iteration,likelihood,model_type,age_month,item,alignment_condition,loglike"
+var header = "iteration,a,b,c,d,e,f,g"
 
 var output_file = 'output/llh_model_chain' + chain + '.csv'
 var callback = webpplSampleWriter.streamQueryCSV(output_file, header);
 
 var output = Infer({
   model,
-  samples: 5000,
-  burn: 50000,
-  lag: 29,
+  samples: 10,
+  burn: 1,
+  lag: 0,
   method: 'MCMC',
   verbose: T,
   callbacks: [callback]
