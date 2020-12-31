@@ -392,8 +392,8 @@ query.add(["modelPrediction",model_type, alignment_condition,age_month, item], M
 
 foreach(function(item){
   var itemLineParameters = all_item_parameters[item]
-  query.add(["parameter","items", item, "intercept", "NA", "NA"], itemLineParameters.intercept)
-  query.add(["parameter","items", item, "slope", "NA", "NA"], itemLineParameters.slope)
+  query.add(["parameter","items", item, "intercept", "NA"], itemLineParameters.intercept)
+  query.add(["parameter","items", item, "slope", "NA"], itemLineParameters.slope)
 }, familiars)
 
 query.add(["parameter","parameters","speaker_optimality", "intercept", "NA"], speakerOptimalityParameters.intercept)
