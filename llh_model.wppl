@@ -351,6 +351,10 @@ var total_correct = combinationData_byAge_byItem_byCondition.length == 0 ? "noDa
 
 // display(total_correct)
 
+//display(model_type)
+//display(priorProbs)
+
+
 var devMixture = logistic(mixture_int + mixture_slope * age_month)
 
 var modelPredictions =
@@ -414,9 +418,9 @@ var callback = webpplSampleWriter.streamQueryCSV(output_file, header);
 
 var output = Infer({
   model,
-  samples: 10,
-  burn: 1,
-  lag: 0,
+  samples: 5000,
+  burn: 25000,
+  lag: 4,
   method: 'MCMC',
   verbose: T,
   callbacks: [callback]
