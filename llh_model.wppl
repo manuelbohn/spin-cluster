@@ -422,6 +422,7 @@ var output = Infer({
   burn: 25000,
   lag: 4,
   method: 'MCMC',
+  onlyMAP: true,
   verbose: T,
   callbacks: [callback]
 });
