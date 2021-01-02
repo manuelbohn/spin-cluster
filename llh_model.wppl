@@ -419,7 +419,7 @@ var output = Infer({
   model,
   samples: 10000,
   burn: 50000,
-  lag: 14,
+  lag: 9,
   method: 'MCMC',
   onlyMAP: true,
   verbose: T,
