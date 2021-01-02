@@ -383,7 +383,7 @@ method: "enumerate"
   n: combinationData_byAge_byItem_byCondition.length}).score(total_correct)
 
 query.add(["likelihood", model_type, alignment_condition,age_month, item],loglike)
-query.add(["modelPrediction",model_type, alignment_condition,age_month, item], Math.exp(modelPredictions.score(1)))
+//query.add(["modelPrediction",model_type, alignment_condition,age_month, item], Math.exp(modelPredictions.score(1)))
 //query.add(["numbers",model_type, alignment_condition,age_month, item,combinationData_byAge_byItem_byCondition.length], total_correct)
 
 }, ["pragmatic", "global", "flat", "prior_only","bias","devBias"])
@@ -394,19 +394,18 @@ query.add(["modelPrediction",model_type, alignment_condition,age_month, item], M
 
 }, combDataAges)
 
-foreach(function(item){
-  var itemLineParameters = all_item_parameters[item]
-  query.add(["parameter","items", item, "intercept", "NA"], itemLineParameters.intercept)
-  query.add(["parameter","items", item, "slope", "NA"], itemLineParameters.slope)
-}, familiars)
+//foreach(function(item){
+//  var itemLineParameters = all_item_parameters[item]
+//  query.add(["parameter","items", item, "intercept", "NA"], itemLineParameters.intercept)
+//  query.add(["parameter","items", item, "slope", "NA"], itemLineParameters.slope)
+//}, familiars)
 
-query.add(["parameter","parameters","speaker_optimality", "intercept", "NA"], speakerOptimalityParameters.intercept)
-query.add(["parameter","parameters","speaker_optimality", "slope", "NA"], speakerOptimalityParameters.slope)
-query.add(["parameter","parameters", "global_sem", "intercept", "NA"], globalLineParameters.intercept)
-query.add(["parameter","parameters", "global_sem", "slope", "NA"], globalLineParameters.slope)
-query.add(["parameter","sigma", "global_sem_sigmas", "intercept", "NA"], itemVariability.intercept)
-query.add(["parameter","sigma", "global_sem_sigmas", "slope", "NA"], itemVariability.slope)
-return query
+//query.add(["parameter","parameters","speaker_optimality", "intercept", "NA"], speakerOptimalityParameters.intercept)
+//query.add(["parameter","parameters","speaker_optimality", "slope", "NA"], speakerOptimalityParameters.slope)
+//query.add(["parameter","parameters", "global_sem", "intercept", "NA"], globalLineParameters.intercept)
+//query.add(["parameter","parameters", "global_sem", "slope", "NA"], globalLineParameters.slope)
+//query.add(["parameter","sigma", "global_sem_sigmas", "intercept", "NA"], itemVariability.intercept)
+//query.add(["parameter","sigma", "global_sem_sigmas", "slope", "NA"], itemVariability.slope)
 return query
 
 }
@@ -418,9 +417,9 @@ var callback = webpplSampleWriter.streamQueryCSV(output_file, header);
 
 var output = Infer({
   model,
-  samples: 5000,
-  burn: 25000,
-  lag: 4,
+  samples: 10000,
+  burn: 50000,
+  lag: 14,
   method: 'MCMC',
   onlyMAP: true,
   verbose: T,
